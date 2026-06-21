@@ -1,0 +1,22 @@
+name: scout_logger_plus_example
+description: Minimal scout-logger-plus integration example.
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dio: ^5.9.0
+  scout_logger_plus:
+    path: ../
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
