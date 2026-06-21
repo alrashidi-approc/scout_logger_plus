@@ -52,7 +52,7 @@ void main() {
       const IngestEvent(type: 'error', timestamp: '2026-01-01T00:00:00Z', payload: {'message': 'x'}),
     ]);
 
-    expect(ok, isFalse);
+    expect(ok.ok, isFalse);
     client.close();
   });
 }

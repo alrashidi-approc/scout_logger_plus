@@ -1,17 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:scout_logger_plus/src/screen_trail.dart';
 import 'package:scout_logger_plus/src/session_summary.dart';
+import 'package:scout_models/scout_models.dart';
 
 void main() {
-  test('screen trail records dwell time between routes', () {
+  test('screen trail records dwell time and navigationType between routes', () {
     final trail = ScreenTrail();
-    trail.record('/home');
-    trail.record('/checkout');
+    trail.record('/home', navigationType: NavTransition.push);
+    trail.record('/checkout', navigationType: NavTransition.push);
     final json = trail.toJson();
     expect(json.first['route'], '/home');
-    expect(json.first['durationMs'], isA<int>());
-    expect(json.first['durationMs'], greaterThanOrEqualTo(0));
+    expect(json.first['navigationType'], 'push');
+    expect(json.last['durationMs'], isA<int>());
+    expect(json.last['durationMs'], greaterThanOrEqualTo(0));
   });
 
   test('buildSessionSummary aggregates breadcrumbs and trail', () {

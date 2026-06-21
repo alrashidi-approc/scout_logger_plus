@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
+import 'package:scout_models/scout_models.dart';
 import 'package:uuid/uuid.dart';
 
 import 'screen_trail.dart';
@@ -11,15 +14,18 @@ class SessionTracker {
     required this.trail,
     required this.onEvent,
     String? sessionId,
+    this.heartbeatInterval = const Duration(minutes: 2),
   }) : sessionId = sessionId ?? const Uuid().v4();
 
   final ScreenTrail trail;
   final SessionEventSink onEvent;
   final String sessionId;
+  final Duration heartbeatInterval;
 
   late final DateTime startedAt = DateTime.now();
   bool _started = false;
   bool _ended = false;
+  Timer? _heartbeat;
 
   bool get isActive => _started && !_ended;
 
@@ -31,12 +37,23 @@ class SessionTracker {
       'sessionId': sessionId,
       'startedAt': startedAt.toUtc().toIso8601String(),
     });
+    _heartbeat = Timer.periodic(heartbeatInterval, (_) => _pulse());
+  }
+
+  void _pulse() {
+    if (!_started || _ended) return;
+    onEvent({
+      'action': 'heartbeat',
+      'sessionId': sessionId,
+      'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
+    });
   }
 
   void stop({Map<String, dynamic>? summary, String? reason}) {
     if (!_started || _ended) return;
     _ended = true;
-    trail.finalizeDwell();
+    _heartbeat?.cancel();
+    _heartbeat = null;
     final endedAt = DateTime.now().toUtc();
     final durationMs = endedAt.difference(startedAt).inMilliseconds;
     onEvent({
@@ -50,30 +67,41 @@ class SessionTracker {
     });
   }
 
-  void onScreen(String? route, {String action = 'view'}) => trail.record(route, action: action);
+  void onScreen(
+    String? route, {
+    NavTransition navigationType = NavTransition.push,
+    String? screenName,
+  }) =>
+      trail.record(route, navigationType: navigationType, screenName: screenName);
 }
 
 class ScoutNavigationObserver extends NavigatorObserver {
   ScoutNavigationObserver(this._onRoute);
 
-  final void Function(String? route, {String action}) _onRoute;
+  final void Function(String? route, {NavTransition navigationType}) _onRoute;
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    _onRoute(_name(route), action: 'push');
+    _onRoute(_name(route), navigationType: NavTransition.push);
     super.didPush(route, previousRoute);
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    _onRoute(_name(previousRoute), action: 'pop');
+    _onRoute(_name(previousRoute), navigationType: NavTransition.pop);
     super.didPop(route, previousRoute);
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
-    _onRoute(_name(newRoute), action: 'replace');
+    _onRoute(_name(newRoute), navigationType: NavTransition.replace);
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _onRoute(_name(previousRoute), navigationType: NavTransition.remove);
+    super.didRemove(route, previousRoute);
   }
 
   String? _name(Route<dynamic>? route) {

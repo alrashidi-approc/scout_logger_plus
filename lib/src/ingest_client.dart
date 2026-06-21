@@ -4,6 +4,13 @@ import 'package:scout_models/scout_models.dart';
 
 import 'scout_ingest_dio.dart';
 
+class IngestSendResult {
+  const IngestSendResult({required this.ok, this.configVersion});
+
+  final bool ok;
+  final int? configVersion;
+}
+
 /// Uploads batched events to the scout server using a private ingest [Dio].
 class IngestClient {
   factory IngestClient({
@@ -44,17 +51,23 @@ class IngestClient {
   final String ingestKey;
   final Dio _dio;
 
-  Future<bool> send(List<IngestEvent> events) async {
-    if (events.isEmpty) return true;
+  Dio get dio => _dio;
+
+  Future<IngestSendResult> send(List<IngestEvent> events) async {
+    if (events.isEmpty) return const IngestSendResult(ok: true);
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         ScoutIngestDio.batchPath,
         data: {'events': events.map((e) => e.toJson()).toList()},
       );
       final code = response.statusCode;
-      return code == 200 || code == 202;
+      final data = response.data;
+      return IngestSendResult(
+        ok: code == 200 || code == 202,
+        configVersion: data?['configVersion'] as int?,
+      );
     } on DioException {
-      return false;
+      return const IngestSendResult(ok: false);
     }
   }
 

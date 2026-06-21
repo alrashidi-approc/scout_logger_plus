@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scout_logger_plus/src/screen_trail.dart';
 import 'package:scout_logger_plus/src/session_tracker.dart';
+import 'package:scout_models/scout_models.dart';
 
 void main() {
   test('start and stop emit one session event each with duration', () {
@@ -9,6 +10,7 @@ void main() {
       trail: ScreenTrail(),
       onEvent: events.add,
       sessionId: 'session-1',
+      heartbeatInterval: const Duration(hours: 1),
     );
 
     tracker.start();
@@ -29,13 +31,15 @@ void main() {
       trail: trail,
       onEvent: events.add,
       sessionId: 'session-1',
+      heartbeatInterval: const Duration(hours: 1),
     );
 
     tracker.start();
-    tracker.onScreen('/home', action: 'push');
+    tracker.onScreen('/home', navigationType: NavTransition.push);
 
     expect(events, hasLength(1));
     expect(trail.currentRoute, '/home');
+    expect(trail.toJson().single['navigationType'], 'push');
   });
 
   test('isActive reflects session state', () {

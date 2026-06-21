@@ -13,6 +13,7 @@ import 'event_queue.dart';
 import 'flutter_binding.dart';
 import 'ingest_client.dart';
 import 'install_store.dart';
+import 'remote_config_client.dart';
 import 'network_capture.dart';
 import 'scout_env.dart';
 import 'scout_options.dart';
@@ -28,6 +29,7 @@ class Scout {
     required ScoutDsn dsn,
     required ScoutOptions options,
     required IngestClient client,
+    required RemoteConfigClient remoteConfig,
     required EventQueue queue,
     required DeviceCollector deviceCollector,
     required ScreenTrail screenTrail,
@@ -36,6 +38,7 @@ class Scout {
   })  : _dsn = dsn,
         _options = options,
         _client = client,
+        _remoteConfig = remoteConfig,
         _queue = queue,
         _deviceCollector = deviceCollector,
         _screenTrail = screenTrail,
@@ -45,8 +48,10 @@ class Scout {
   static Scout? _instance;
 
   final ScoutDsn _dsn;
-  final ScoutOptions _options;
+  ScoutOptions _options;
   final IngestClient _client;
+  final RemoteConfigClient _remoteConfig;
+  int _configVersion = 0;
   final EventQueue _queue;
   final DeviceCollector _deviceCollector;
   final ScreenTrail _screenTrail;
@@ -101,6 +106,7 @@ class Scout {
         autoCollectRelease: o.autoCollectRelease,
         enableFlutterHooks: o.enableFlutterHooks,
         trackNavigation: o.trackNavigation,
+        useRemoteConfig: o.useRemoteConfig,
         flushInterval: o.flushInterval,
         maxBatchSize: o.maxBatchSize,
         enabledLevels: o.enabledLevels,
@@ -109,6 +115,7 @@ class Scout {
         networkRedactHeaders: o.networkRedactHeaders,
         networkRedactQueryParams: o.networkRedactQueryParams,
         networkSlowThresholdMs: o.networkSlowThresholdMs,
+        networkIgnoreStatusCodes: o.networkIgnoreStatusCodes,
         recoverOrphanSessions: o.recoverOrphanSessions,
         sessionBackgroundTimeout: o.sessionBackgroundTimeout,
         autoTrackConnectivity: o.autoTrackConnectivity,
@@ -129,31 +136,45 @@ class Scout {
       ingestKey: dsn.ingestKey,
       onError: options.debug ? (e) => logError('scout_logger_plus ingest:', e) : null,
     );
+    final remoteConfig = RemoteConfigClient(client.dio);
+    var effectiveOptions = options;
+    var configVersion = 0;
+    if (options.useRemoteConfig) {
+      final remote = await remoteConfig.fetch();
+      if (remote != null) {
+        effectiveOptions = options.withRemote(remote.sdk);
+        configVersion = remote.configVersion;
+      }
+    }
+
+    late Scout scout;
     final queue = EventQueue(
       client: client,
-      maxBatch: options.maxBatchSize,
-      flushInterval: options.flushInterval,
-      onError: options.debug ? (e) => logError('scout_logger_plus:', e) : null,
+      maxBatch: effectiveOptions.maxBatchSize,
+      flushInterval: effectiveOptions.flushInterval,
+      onError: effectiveOptions.debug ? (e) => logError('scout_logger_plus:', e) : null,
+      onConfigVersion: (v) => scout._onIngestConfigVersion(v),
     );
     final deviceCollector = DeviceCollector();
 
-    late Scout scout;
     final sessionTracker = SessionTracker(
       trail: trail,
-      sessionId: options.sessionId,
+      sessionId: effectiveOptions.sessionId,
       onEvent: (p) => scout._sendSession(p),
     );
 
     scout = Scout._(
       dsn: dsn,
-      options: options,
+      options: effectiveOptions,
       client: client,
+      remoteConfig: remoteConfig,
       queue: queue,
       deviceCollector: deviceCollector,
       screenTrail: trail,
       sessionTracker: sessionTracker,
       breadcrumbs: BreadcrumbBuffer(),
     );
+    scout._configVersion = configVersion;
 
     scout._device = await deviceCollector.collect();
     scout._install = await InstallStore.loadOrCreate();
@@ -165,19 +186,19 @@ class Scout {
       'daysSinceInstall': scout._install['daysSinceInstall'],
     });
     deviceCollector.patch(scout._device);
-    if (options.release != null) {
-      scout._release = {'name': options.release, 'environment': options.environment};
-    } else if (options.autoCollectRelease) {
-      scout._release = await collectRelease(environment: options.environment);
+    if (effectiveOptions.release != null) {
+      scout._release = {'name': effectiveOptions.release, 'environment': effectiveOptions.environment};
+    } else if (effectiveOptions.autoCollectRelease) {
+      scout._release = await collectRelease(environment: effectiveOptions.environment);
     } else {
-      scout._release = {'environment': options.environment};
+      scout._release = {'environment': effectiveOptions.environment};
     }
 
     queue.start();
-    if (options.recoverOrphanSessions) await scout._recoverOrphanSession();
+    if (effectiveOptions.recoverOrphanSessions) await scout._recoverOrphanSession();
     sessionTracker.start();
-    if (options.enableFlutterHooks) scout._installFlutterHooks();
-    if (options.autoTrackConnectivity) scout._watchConnectivity();
+    if (effectiveOptions.enableFlutterHooks) scout._installFlutterHooks();
+    if (effectiveOptions.autoTrackConnectivity) scout._watchConnectivity();
     _instance = scout;
     return scout;
   }
@@ -240,11 +261,10 @@ class Scout {
       _context[key] = isSensitiveKey(key) ? '[Redacted]' : value;
   void clearContext() => _context.clear();
 
-  void trackScreen(String route, {String? screenName, String action = 'view'}) {
+  void trackScreen(String route, {String? screenName, NavTransition navigationType = NavTransition.push}) {
     if (!_options.trackNavigation) return;
-    _sessionTracker.onScreen(route, action: action);
-    if (screenName != null) _screenTrail.record(route, action: action, screenName: screenName);
-    _crumbNav(route, screenName: screenName, action: action);
+    _sessionTracker.onScreen(route, navigationType: navigationType, screenName: screenName);
+    _crumbNav(route, screenName: screenName, navigationType: navigationType);
   }
 
   /// User interaction — breadcrumb + lightweight span (checkout, button tap, etc.).
@@ -329,6 +349,7 @@ class Scout {
     Map<String, dynamic>? response,
     String? curl,
   }) {
+    if (statusCode != null && _options.networkIgnoreStatusCodes.contains(statusCode)) return;
     final safeUrl = redactUrl(url, redactQueryKeys: _options.networkRedactQueryParams);
     final isError = failed || (statusCode != null && statusCode >= 400);
     final hasResponse = statusCode != null || response != null;
@@ -408,7 +429,6 @@ class Scout {
 
   void _endSession({String? reason}) {
     if (!_sessionTracker.isActive) return;
-    _screenTrail.finalizeDwell();
     _sessionTracker.stop(
       reason: reason,
       summary: buildSessionSummary(
@@ -528,11 +548,14 @@ class Scout {
         _breadcrumbs.add(type: 'lifecycle', route: _screenTrail.currentRoute, message: 'App backgrounded');
         await flush();
       },
-      onResume: () => _breadcrumbs.add(
-        type: 'lifecycle',
-        route: _screenTrail.currentRoute,
-        message: 'App foregrounded',
-      ),
+      onResume: () {
+        _breadcrumbs.add(
+          type: 'lifecycle',
+          route: _screenTrail.currentRoute,
+          message: 'App foregrounded',
+        );
+        unawaited(_refreshRemoteConfig());
+      },
       onEnd: () {
         _endSession();
         unawaited(flush());
@@ -559,19 +582,37 @@ class Scout {
     });
   }
 
-  void _onRoute(String? route, {String action = 'view'}) {
+  void _onRoute(String? route, {NavTransition navigationType = NavTransition.push}) {
     if (!_options.trackNavigation || route == null || route.isEmpty) return;
-    _sessionTracker.onScreen(route, action: action);
-    _crumbNav(route, action: action);
+    _sessionTracker.onScreen(route, navigationType: navigationType);
+    _crumbNav(route, navigationType: navigationType);
   }
 
-  void _crumbNav(String route, {String? screenName, String action = 'view'}) {
+  void _crumbNav(String route, {String? screenName, NavTransition navigationType = NavTransition.push}) {
     _breadcrumbs.add(
       type: 'navigation',
       route: route,
       message: screenName ?? route,
-      data: {'action': action, if (screenName != null) 'screenName': screenName},
+      data: {
+        'navigationType': navigationType.wire,
+        if (screenName != null) 'screenName': screenName,
+      },
     );
+  }
+
+  Future<void> _refreshRemoteConfig({bool silent = false}) async {
+    if (!_options.useRemoteConfig) return;
+    final remote = await _remoteConfig.fetch();
+    if (remote == null) return;
+    if (remote.configVersion <= _configVersion) return;
+    _configVersion = remote.configVersion;
+    _options = _options.withRemote(remote.sdk);
+    if (!silent && _options.debug) debugPrint('scout_logger_plus: remote config v$_configVersion applied');
+  }
+
+  void _onIngestConfigVersion(int version) {
+    if (version <= _configVersion) return;
+    unawaited(_refreshRemoteConfig());
   }
 
   void _crumbLog(String level, String message) {
@@ -602,7 +643,7 @@ class Scout {
       final loc = currentLocation();
       if (loc.isEmpty || loc == last) return;
       last = loc;
-      trackScreen(loc);
+      trackScreen(loc, navigationType: NavTransition.go);
     }
 
     void onChange() {

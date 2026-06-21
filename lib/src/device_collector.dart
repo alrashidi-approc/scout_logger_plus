@@ -81,6 +81,7 @@ class DeviceCollector {
 
     _cached = {
       'platform': platform,
+      'version': osVersion,
       'osVersion': osVersion,
       'deviceName': deviceName,
       'manufacturer': manufacturer,

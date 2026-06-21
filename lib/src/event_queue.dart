@@ -10,12 +10,14 @@ class EventQueue {
     required this.maxBatch,
     required this.flushInterval,
     this.onError,
+    this.onConfigVersion,
   });
 
   final IngestClient client;
   final int maxBatch;
   final Duration flushInterval;
   final void Function(Object error)? onError;
+  final void Function(int configVersion)? onConfigVersion;
 
   final List<IngestEvent> _pending = [];
   Timer? _timer;
@@ -39,8 +41,9 @@ class EventQueue {
     final batch = List<IngestEvent>.from(_pending);
     _pending.clear();
     try {
-      final ok = await client.send(batch);
-      if (!ok) _pending.insertAll(0, batch);
+      final result = await client.send(batch);
+      if (result.configVersion != null) onConfigVersion?.call(result.configVersion!);
+      if (!result.ok) _pending.insertAll(0, batch);
     } catch (e, st) {
       _pending.insertAll(0, batch);
       onError?.call(e);
