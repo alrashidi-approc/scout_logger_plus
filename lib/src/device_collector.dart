@@ -13,7 +13,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 class DeviceCollector {
   Map<String, dynamic> _cached = {};
   final Battery _battery = Battery();
-  bool _countryManual = false;
+  bool _countryLocked = false;
 
   static const _ipApiUrl = 'http://ip-api.com/json?fields=status,countryCode';
 
@@ -129,22 +129,26 @@ class DeviceCollector {
     return Map<String, dynamic>.from(_cached);
   }
 
-  Map<String, dynamic> current() => Map<String, dynamic>.from(_cached);
+  Map<String, dynamic> snapshot() => Map<String, dynamic>.from(_cached);
 
-  /// Sets [device.country] from ip-api.com, else device locale. No location permission.
+  /// Package-internal: ip-api.com → [country], else devicelocale [countryCode]. No location permission.
   Future<void> refreshCountry() async {
-    if (_countryManual) return;
+    if (_countryLocked) return;
     final fromIp = await _countryFromIpApi();
     if (fromIp != null) {
       _cached['country'] = fromIp;
+      _cached['countrySource'] = 'ip';
       return;
     }
-    final locale = _cached['localeCountry']?.toString();
-    if (locale != null && locale.isNotEmpty) _cached['country'] = locale.toUpperCase();
+    final locale = _cached['countryCode']?.toString();
+    if (locale != null && locale.isNotEmpty) {
+      _cached['country'] = locale.toUpperCase();
+      _cached['countrySource'] = 'locale';
+    }
   }
 
   void patch(Map<String, dynamic> data, {bool lockCountry = false}) {
-    if (lockCountry && data.containsKey('country')) _countryManual = true;
+    if (lockCountry && data.containsKey('country')) _countryLocked = true;
     _cached.addAll(data);
   }
 
@@ -164,7 +168,7 @@ class DeviceCollector {
       'locale': locale.toLanguageTag(),
       'languageCode': locale.languageCode,
       if (locale.countryCode != null && locale.countryCode!.isNotEmpty)
-        'localeCountry': locale.countryCode!.toUpperCase(),
+        'countryCode': locale.countryCode!.toUpperCase(),
     };
   }
 

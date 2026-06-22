@@ -180,8 +180,6 @@ class Scout {
     scout._configVersion = configVersion;
 
     scout._device = await deviceCollector.collect();
-    await deviceCollector.refreshCountry();
-    scout._device = deviceCollector.current();
     scout._install = await InstallStore.loadOrCreate();
     scout._device.addAll({
       'installId': scout._install['installId'],
@@ -191,6 +189,8 @@ class Scout {
       'daysSinceInstall': scout._install['daysSinceInstall'],
     });
     deviceCollector.patch(scout._device);
+    await deviceCollector.refreshCountry();
+    scout._device = deviceCollector.snapshot();
     if (effectiveOptions.release != null) {
       scout._release = {'name': effectiveOptions.release, 'environment': effectiveOptions.environment};
     } else if (effectiveOptions.autoCollectRelease) {
@@ -597,8 +597,8 @@ class Scout {
           message: 'App foregrounded',
         );
         unawaited(_refreshRemoteConfig());
-        unawaited(_deviceCollector.refreshBattery().then((_) async {
-          _device = await _deviceCollector.collect();
+        unawaited(_deviceCollector.refreshBattery().then((_) {
+          _device = _deviceCollector.snapshot();
         }));
       },
       onEnd: () {
@@ -617,7 +617,7 @@ class Scout {
         'isOnline': online,
         'connectivity': results.map((c) => c.name).toList(),
       });
-      _device = await _deviceCollector.collect();
+      _device = _deviceCollector.snapshot();
       _breadcrumbs.add(
         type: 'lifecycle',
         route: _screenTrail.currentRoute,
