@@ -18,21 +18,19 @@ dependencies:
       ref: v1.0.0
   dio: ^5.9.0   # required for network logging on your API client
 
-flutter:
-  assets:
-    - .env
-```
-
-`scout_models` is pulled transitively from the [platform repo](https://github.com/alrashidi-approc/scout-logger) (`packages/scout_models`). That repo is private — use SSH git access or a local override:
-
-```yaml
 dependency_overrides:
   scout_models:
     git:
       url: git@github.com:alrashidi-approc/scout-logger.git
       path: packages/scout_models
       ref: main
+
+flutter:
+  assets:
+    - .env
 ```
+
+`scout_models` resolves from git inside the package. The platform repo is **private** — the override above (SSH) is required for most consumer apps. See [package changes for consumer apps](docs/scout_logger_plus_package_changes.md) for v1.0.0 git-consumer fixes.
 
 **Local SDK development** (both repos cloned side by side):
 
@@ -243,10 +241,13 @@ Scout.instance.trackScreen('/settings', navigationType: NavTransition.push);
 import 'package:scout_logger_plus/scout_go_router.dart';
 
 await Scout.initFromEnv();
+
 if (Scout.isInitialized) attachScoutGoRouter(router);
 
 runApp(MaterialApp.router(routerConfig: router));
 ```
+
+The package defers the first route sync to the first frame and falls back to `routeInformationProvider` when the match list is not ready — no `addPostFrameCallback` wrapper needed in your app.
 
 - Records routes as **`go`** (declarative).
 - **Do not** combine with `ScoutApp` / `navigatorObservers`.
@@ -461,4 +462,10 @@ Internal `0.2.x` tags preceded v1.0.0 during dashboard compat work. New integrat
 
 ---
 
-Platform setup: [scout-logger README](https://github.com/alrashidi-approc/scout-logger/blob/main/README.md) · EPA feedback: [docs/scout_logger_plus_enhancement_suggestions.md](docs/scout_logger_plus_enhancement_suggestions.md)
+Platform setup: [scout-logger README](https://github.com/alrashidi-approc/scout-logger/blob/main/README.md)
+
+**Docs**
+
+- [SDK-DASHBOARD-COMPAT.md](docs/SDK-DASHBOARD-COMPAT.md) — payload contract with dashboard
+- [scout_logger_plus_package_changes.md](docs/scout_logger_plus_package_changes.md) — v1.0.0 git consumer fixes (scout_models, go_router, GoRouter attach)
+- [scout_logger_plus_enhancement_suggestions.md](docs/scout_logger_plus_enhancement_suggestions.md) — EPA integration feedback

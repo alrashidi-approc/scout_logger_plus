@@ -16,6 +16,8 @@ List<NavigatorObserver> scoutRouterObservers([Scout? scout]) {
 ///
 /// Prefer this over [scoutRouterObservers] alone for GoRouter apps.
 /// Do not combine both — you will get duplicate screen events.
+///
+/// Safe to call before or after [runApp] — initial sync runs on the first frame.
 void attachScoutGoRouter(
   GoRouter router, {
   Scout? scout,
@@ -34,9 +36,9 @@ void attachScoutGoRouter(
 
 String _scoutGoRouterLocation(GoRouter router) {
   try {
-    return router.state.matchedLocation;
-  } catch (_) {
-    final path = router.routeInformationProvider.value.uri.path;
-    return path.isEmpty ? '/' : path;
-  }
+    final loc = router.state.matchedLocation;
+    if (loc.isNotEmpty) return loc;
+  } catch (_) {}
+  final path = router.routeInformationProvider.value.uri.path;
+  return path.isEmpty ? '/' : path;
 }

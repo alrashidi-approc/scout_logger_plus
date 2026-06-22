@@ -700,7 +700,7 @@ class Scout {
     }
 
     addListener(onChange);
-    sync();
+    WidgetsBinding.instance.addPostFrameCallback((_) => sync());
     _goRouterDetach = () {
       timer?.cancel();
       removeListener(onChange);
