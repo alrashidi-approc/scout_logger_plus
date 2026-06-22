@@ -1,79 +1,123 @@
 # scout_logger_plus
 
-Flutter SDK for the [scout-logger](https://github.com/YOUR_ORG/scout-logger) platform — errors, logs, sessions, screen trails, and network events in your dashboard.
+Flutter SDK for the [scout-logger](https://github.com/alrashidi-approc/scout-logger) platform — errors, logs, sessions, screen trails, and network events in your dashboard.
 
-This package lives in its **own GitHub repo** (separate from the server/dashboard). Add it to your Flutter app; point it at a scout project DSN.
+**Latest release: [`v1.0.0`](https://github.com/alrashidi-approc/scout_logger_plus/releases/tag/v1.0.0)** — first stable, dashboard-compatible SDK.
 
-**Current version: `0.2.2`** — dashboard-compatible payloads (navigation badges, remote settings, session heartbeats, HTTP ignore codes). Requires `scout_models` from the platform repo with `navigation.dart` and `sdk_config.dart` (included on platform `main`).
-
----
-
-## What's new in 0.2.2
-
-| Feature | Client impact |
-|---------|----------------|
-| **`networkLogScope` in remote config** | Dashboard **Settings** controls `all` / `errorsOnly` / `slowOnly` per project |
-| **`recordResilientLog`** | Official dio_resilient bridge — success/cache/queue only |
-| **`batteryLevel`** | Device tab shows battery (`0.00`–`1.00` string), refreshed on resume |
-
-## What's new in 0.2.1
-
-| Feature | Client impact |
-|---------|----------------|
-| **`ScoutNetworkLogScope`** | `errorsOnly` / `slowOnly` — less noise from `attachScout()` |
-| **Public network capture API** | `captureRequest`, `captureResponse`, `buildCurl`, `buildNetworkReadable` exported |
-| **`apiBaseUrl`** | Resolves path-only URLs in `recordNetwork` |
-| **`hasResponseOverride`** | Bridge layers can flag HTTP responses without a body map |
-| **EPA redaction defaults** | `securpass`, `securuser`, `epamobkey`, `civilid`, … |
-| **`package_info_plus`** | Wider constraint `>=8.3.0 <11.0.0` for pub solver |
-
-## What's new in 0.2.0
-
-| Feature | Client impact |
-|---------|----------------|
-| **`navigationType` on screen trail** | Timeline → User journey shows **PUSH** / **POP** / **GO** badges (no more “NO NAV” warning) |
-| **Remote SDK config** | Dashboard **Settings** can tune log levels, nav tracking, network options — fetched on init and app resume |
-| **`networkIgnoreStatusCodes`** | Skip logging expected HTTP failures (e.g. `401` on token refresh) — local or remote |
-| **Session heartbeats** | Powers **Analytics → Sessions** timelines between start/end |
-| **Richer device payload** | OS `version`, connectivity, locale — better Device tab in event inspector |
-
-If you upgrade from `0.1.x`, no API breaks — defaults match previous behaviour. Opt into remote config with `useRemoteConfig: true` (default).
+Pin the tag in `pubspec.yaml` for reproducible builds. Requires [scout-logger](https://github.com/alrashidi-approc/scout-logger) platform `main` (or newer) for `scout_models` with `navigation.dart` and `sdk_config.dart`.
 
 ---
 
-## Implementation checklist
-
-Use this order when wiring scout into a client app:
-
-1. **Platform** — run [scout-logger](https://github.com/YOUR_ORG/scout-logger) (local or deployed), create a project, copy the **DSN** from the dashboard.
-2. **Dependency** — add `scout_logger_plus` **v0.2.0+** (+ `dio` for API logging) in `pubspec.yaml`.
-3. **`.env`** — copy [`.env.example`](.env.example) → `.env`, paste DSN, register `.env` as a Flutter asset.
-4. **`.gitignore`** — never commit `.env` (contains `sk_live_…`).
-5. **`main()`** — `WidgetsFlutterBinding.ensureInitialized()` → `await Scout.initFromEnv()` → attach Dio → `runApp(ScoutApp(...))`.
-6. **Navigation** — `ScoutApp` + `navigatorObservers` **or** `attachScoutGoRouter` — pick one, not both (enables `navigationType` in screen trail).
-7. **Login** — call `Scout.instance.setUser(...)` after the user signs in.
-8. **Verify** — navigate Home → checkout → back, send a test error, check **Timeline → User journey** (PUSH/POP badges), **Issues**, and **Analytics → Sessions**.
-
----
-
-## Quick start
+## Install (v1.0.0)
 
 ```yaml
-# pubspec.yaml
 dependencies:
   scout_logger_plus:
     git:
-      url: https://github.com/YOUR_ORG/scout_logger_plus.git
-      ref: v0.2.0   # or main — pin a tag for reproducible builds
-  dio: ^5.9.0
+      url: https://github.com/alrashidi-approc/scout_logger_plus.git
+      ref: v1.0.0
+  dio: ^5.9.0   # required for network logging on your API client
 
 flutter:
   assets:
     - .env
 ```
 
+`scout_models` is pulled transitively from the [platform repo](https://github.com/alrashidi-approc/scout-logger) (`packages/scout_models`). That repo is private — use SSH git access or a local override:
+
+```yaml
+dependency_overrides:
+  scout_models:
+    git:
+      url: git@github.com:alrashidi-approc/scout-logger.git
+      path: packages/scout_models
+      ref: main
+```
+
+**Local SDK development** (both repos cloned side by side):
+
+```yaml
+dependency_overrides:
+  scout_models:
+    path: ../scout-logger/packages/scout_models
+```
+
+---
+
+## Upgrade to v1.0.0
+
+If you integrated an older SDK or legacy `scout_logger`:
+
+| Step | Action |
+|------|--------|
+| 1 | Bump `ref:` to `v1.0.0` and run `flutter pub get` |
+| 2 | Ensure platform server/dashboard is current (remote Settings, Timeline badges) |
+| 3 | Keep `useRemoteConfig: true` (default) — dashboard **Settings** now controls log levels, network scope, ignore codes |
+| 4 | Wire navigation once: `ScoutApp` + observers **or** `attachScoutGoRouter` — not both |
+| 5 | Verify **Timeline → User journey** shows PUSH/POP badges after a navigation + error test |
+
+No breaking API changes from pre-1.0 betas — defaults match prior behaviour (`networkLogScope: all`, remote config on).
+
+---
+
+## What's in v1.0.0
+
+### Dashboard compatibility
+
+| Feature | Dashboard use |
+|---------|----------------|
+| **`navigationType` on screen trail** | Timeline → User journey **PUSH** / **POP** / **GO** badges |
+| **Remote SDK config** | Project **Settings** tunes SDK without app release |
+| **Session heartbeats** | Analytics → Sessions timeline |
+| **Rich payload envelope** | user, device, screen, release, breadcrumbs, custom context |
+| **`batteryLevel`** | Device tab (`"0.82"` string), refreshed on resume |
+
+### Network telemetry
+
+| Feature | Use |
+|---------|-----|
+| **`attachScout()`** | Auto-capture on your app Dio (not ingest client) |
+| **`ScoutNetworkLogScope`** | `all` / `errorsOnly` / `slowOnly` — local or remote |
+| **`networkIgnoreStatusCodes`** | Skip 401, 403, etc. — local or remote |
+| **`apiBaseUrl`** | Resolve path-only URLs (`/inbox` → full URL) |
+| **`hasResponseOverride`** | Custom bridges when status exists without body map |
+| **Public capture API** | `captureRequest`, `captureResponse`, `buildCurl`, `buildNetworkReadable` |
+| **`recordResilientLog`** | Official [dio_resilient](https://pub.dev/packages/dio_resilient) bridge |
+
+### Remote config (dashboard Settings)
+
+Fetched on init, app resume, and when ingest returns a newer `configVersion`:
+
+| Field | Effect |
+|-------|--------|
+| `enabledLevels` | Drop logs below unchecked levels |
+| `enableFlutterHooks` | `FlutterError` + platform crash handlers |
+| `trackNavigation` | Screen trail + nav observer |
+| `networkCaptureBodies` | Request/response bodies in network events |
+| `networkSlowThresholdMs` | Slow-request flag (500–60000 ms) |
+| `networkIgnoreStatusCodes` | Skip matching HTTP statuses |
+| `networkLogScope` | `all` / `errorsOnly` / `slowOnly` |
+
+Always local: `environment`, `release`, redaction lists, `flushInterval`, DSN.
+
+---
+
+## Implementation checklist
+
+1. **Platform** — deploy [scout-logger](https://github.com/alrashidi-approc/scout-logger), create a project, copy **DSN** from dashboard.
+2. **Dependency** — pin `ref: v1.0.0` (+ `dio` for API logging).
+3. **`.env`** — copy [`.env.example`](.env.example) → `.env`, register as Flutter asset.
+4. **`main()`** — `WidgetsFlutterBinding.ensureInitialized()` → `await Scout.initFromEnv()` → attach Dio → `runApp(ScoutApp(...))`.
+5. **Navigation** — `ScoutApp` + `navigatorObservers` **or** `attachScoutGoRouter` — pick one.
+6. **Login** — `Scout.instance.setUser(...)` after auth.
+7. **Verify** — navigate → test error → check **Timeline**, **Issues**, **Analytics → Sessions**.
+
+---
+
+## Quick start
+
 ```env
-# .env — paste the full DSN from the scout dashboard
+# .env — full DSN from dashboard (include :PORT)
 SCOUT_DSN=http://sk_live_YOUR_KEY@your-host:PORT/your-project-id
 SCOUT_ENVIRONMENT=development
 ```
@@ -85,7 +129,14 @@ import 'package:scout_logger_plus/scout_logger_plus.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Scout.initFromEnv();
+
+  await Scout.initFromEnv(
+    options: const ScoutOptions(
+      apiBaseUrl: 'https://api.yourapp.com',
+      useRemoteConfig: true,
+      networkIgnoreStatusCodes: {401},
+    ),
+  );
 
   if (Scout.isInitialized) {
     Dio(BaseOptions(baseUrl: 'https://api.yourapp.com')).attachScout();
@@ -104,112 +155,56 @@ Run the [example app](example/): `cp example/.env.example example/.env` → past
 
 ---
 
-## 1. Add the dependency
-
-```yaml
-dependencies:
-  scout_logger_plus:
-    git:
-      url: https://github.com/YOUR_ORG/scout_logger_plus.git
-      ref: v0.2.0
-  dio: ^5.9.0   # required only if you want network logging on your API client
-```
-
-- `flutter_dotenv` is bundled — your app does not need to add it unless you read other keys yourself.
-- `scout_models` is pulled transitively from the [platform repo](https://github.com/YOUR_ORG/scout-logger) (`packages/scout_models`). **0.2.0 requires a platform ref that includes `navigation.dart` and `sdk_config.dart`.**
-
-**SDK development** (clone next to platform repo):
-
-```yaml
-dependency_overrides:
-  scout_models:
-    path: ../scout-logger/packages/scout_models
-```
-
----
-
-## 2. Configure `.env`
+## Configure `.env`
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `SCOUT_DSN` | yes | Full DSN copied from the dashboard |
+| `SCOUT_DSN` | yes | Full DSN from dashboard |
 | `SCOUT_ENVIRONMENT` | no | Overrides `ScoutOptions.environment` (default `production`) |
 
-Copy [`.env.example`](.env.example) to your app root. Register in `pubspec.yaml`:
-
-```yaml
-flutter:
-  assets:
-    - .env
-```
-
-Add to your app `.gitignore`:
-
-```
-.env
-```
-
-**DSN format** — copy exactly from the dashboard (host, port, project id):
+**DSN format** — copy exactly (host, port, project id):
 
 ```
 http://sk_live_<key>@<host>:<port>/<project_id>
 ```
 
 ```env
-# ✅ full DSN from dashboard
-SCOUT_DSN=http://sk_live_...@your-host:PORT/project-id
+# ✅ full DSN
+SCOUT_DSN=http://sk_live_...@your-host:8080/project-id
 
 # ❌ missing port — ingest will time out
 SCOUT_DSN=http://sk_live_...@your-host/project-id
 ```
 
-Read other keys from the same file (optional):
-
-```dart
-final apiBase = ScoutEnv.read('API_BASE_URL') ?? 'https://api.yourapp.com';
-```
-
----
-
-## 3. Initialize in `main()`
-
-Always init **before** `runApp`. Scout is optional per flavor — missing DSN is safe.
-
-```dart
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  await Scout.initFromEnv(
-    options: const ScoutOptions(
-      debug: true, // console ingest errors (keys redacted)
-      useRemoteConfig: true, // fetch dashboard Settings on init + resume (default)
-      enabledLevels: {
-        ScoutLevel.error,
-        ScoutLevel.warning,
-        ScoutLevel.info,
-      },
-      networkIgnoreStatusCodes: {401}, // skip 401 network events until remote loads
-    ),
-  );
-
-  // App API Dio — separate from scout's internal ingest client
-  if (Scout.isInitialized) {
-    apiDio = Dio(BaseOptions(baseUrl: 'https://api.yourapp.com'))
-      ..attachScout();
-  }
-
-  runApp(const MyApp());
-}
-```
-
-**Without `.env`** (CI, `--dart-define`, secrets manager):
+**Without `.env`** (CI, `--dart-define`):
 
 ```dart
 const dsn = String.fromEnvironment('SCOUT_DSN');
 if (dsn.isNotEmpty) await Scout.init(dsn);
 ```
 
-**Guard calls** when scout may be off:
+---
+
+## Initialize in `main()`
+
+Always init **before** `runApp`. Missing DSN is safe — scout stays off.
+
+```dart
+await Scout.initFromEnv(
+  options: const ScoutOptions(
+    debug: true,
+    useRemoteConfig: true,
+    enabledLevels: {ScoutLevel.error, ScoutLevel.warning, ScoutLevel.info},
+    networkLogScope: ScoutNetworkLogScope.all, // remote Settings can override
+    networkIgnoreStatusCodes: {401},
+    apiBaseUrl: 'https://api.yourapp.com',
+  ),
+);
+
+if (Scout.isInitialized) {
+  apiDio = Dio(BaseOptions(baseUrl: 'https://api.yourapp.com'))..attachScout();
+}
+```
 
 ```dart
 if (!Scout.isInitialized) return;
@@ -218,176 +213,104 @@ Scout.instance.logInfo('Ready');
 
 ---
 
-## 4. Navigation (pick one pattern)
+## Navigation (pick one)
 
-Scout records a **screen trail** (`payload.screenTrail`) with **`navigationType`** on every step (`push`, `pop`, `replace`, `remove`, `go`). The dashboard Timeline tab uses these for **PUSH** / **POP** badges in User journey.
+Scout sends `payload.screenTrail` with **`navigationType`** on each step. Dashboard Timeline shows **PUSH** / **POP** badges.
 
-Choose **one** integration — duplicate observers double-count screens.
-
-### A — `MaterialApp` / imperative routes (recommended default)
+### A — `MaterialApp` (default)
 
 ```dart
 runApp(ScoutApp(
-  builder: (scoutObservers) => MaterialApp(
-    navigatorObservers: scoutObservers,
-    routes: {
-      '/': (_) => const HomeScreen(),
-      '/settings': (_) => const SettingsScreen(),
-    },
+  builder: (observers) => MaterialApp(
+    navigatorObservers: observers,
+    routes: {'/': (_) => const HomeScreen()},
     initialRoute: '/',
   ),
 ));
 ```
 
-`ScoutApp` passes an empty observer list when scout is not initialized, so your app still runs without a DSN.
-
-Manual screen (tabs, `PageView`, custom routers):
+Manual screens:
 
 ```dart
-Scout.instance.trackScreen(
-  '/settings',
-  screenName: 'Settings',
-  navigationType: NavTransition.push, // optional — default is push
-);
+import 'package:scout_models/scout_models.dart';
+
+Scout.instance.trackScreen('/settings', navigationType: NavTransition.push);
 ```
 
-Import `NavTransition` from `package:scout_models/scout_models.dart` when setting types explicitly.
-
 ### B — GoRouter
-
-Import the GoRouter helper separately:
 
 ```dart
 import 'package:scout_logger_plus/scout_go_router.dart';
 
-final router = GoRouter(
-  routes: [
-    GoRoute(path: '/', builder: (_, __) => const HomeScreen()),
-    GoRoute(path: '/checkout', builder: (_, __) => const CheckoutScreen()),
-  ],
-);
+await Scout.initFromEnv();
+if (Scout.isInitialized) attachScoutGoRouter(router);
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Scout.initFromEnv();
-
-  if (Scout.isInitialized) attachScoutGoRouter(router);
-
-  runApp(MaterialApp.router(routerConfig: router));
-}
+runApp(MaterialApp.router(routerConfig: router));
 ```
 
-- Uses `matchedLocation` for clean paths (e.g. `/checkout`, not `MaterialPageRoute<dynamic>`).
-- Records navigation as **`go`** (declarative routing — not a stack push).
-- **Do not** pass `ScoutApp` / `navigatorObservers` when using `attachScoutGoRouter`.
-- Call `attachScoutGoRouter` only **after** `Scout.init` / `initFromEnv`.
+- Records routes as **`go`** (declarative).
+- **Do not** combine with `ScoutApp` / `navigatorObservers`.
 
-Alternative (shell routes with nested navigators only — prefer `attachScoutGoRouter` for top-level GoRouter):
+---
+
+## User identity & context
 
 ```dart
-GoRouter(
-  observers: scoutRouterObservers(),
-  routes: [...],
-);
+Scout.instance.setUser(id: user.id, email: user.email, name: user.name);
+Scout.instance.setContext({'tenantId': tenant.id}); // sensitive keys redacted
+Scout.instance.clearUser(); // on logout
 ```
 
 ---
 
-## 5. After login — identify the user
-
-Call once when auth succeeds (logout: `clearUser()`):
+## Logs, errors, actions
 
 ```dart
-Scout.instance.setUser(
-  id: user.id,
-  email: user.email,
-  name: user.displayName,
-  traits: {'plan': user.plan},
-);
-```
-
-If you never call `setUser`, scout sends an anonymous install id (stable per device).
-
-Attach business context (sensitive keys auto-redacted):
-
-```dart
-Scout.instance.setContext({'tenantId': tenant.id, 'role': user.role});
-```
-
----
-
-## 6. Logs, errors, and actions
-
-```dart
-if (!Scout.isInitialized) return;
-
-// Structured logs
-Scout.instance.logInfo('Profile loaded', context: {'userId': id});
+Scout.instance.logInfo('Profile loaded');
 Scout.instance.logWarning('Cache miss');
-Scout.instance.logSuccess('Payment confirmed');
-
-// Errors — grouped in dashboard Issues
-Scout.instance.captureException(
-  error,
-  stackTrace,
-  category: ScoutCategory.network,
-  context: {'orderId': orderId},
-);
-
-// Message without a thrown object
+Scout.instance.captureException(error, stack, category: ScoutCategory.network);
 Scout.instance.captureMessage('Invalid state', category: ScoutCategory.logic);
-
-// User interactions — breadcrumb + span; counted in session summary
 Scout.instance.trackAction('checkout_started', data: {'items': 3});
-
-// Force send (e.g. before showing a snackbar in a demo, or after fatal error)
 await Scout.instance.flush();
 ```
-
-Uncaught Flutter and platform errors are captured automatically (`enableFlutterHooks: true`).
 
 | `ScoutCategory` | Use for |
 |-----------------|---------|
 | `network` | API / HTTP failures |
-| `system` | General app errors (default) |
-| `crashing` | Fatal / uncaught (urgent) |
-| `logic` | Business rule violations |
-| `ui` | Widget / layout issues |
+| `system` | General errors (default) |
+| `crashing` | Fatal / uncaught |
+| `logic` | Business rules |
+| `ui` | Widget / layout |
+
+Uncaught Flutter and platform errors are captured when `enableFlutterHooks: true`.
 
 ---
 
-## 7. Network logging (your API Dio)
+## Network logging
 
-Use a **dedicated Dio** for your backend. Never call `attachScout()` on scout's private ingest client.
+Use a **dedicated Dio** for your backend. Never `attachScout()` on scout's ingest client.
 
 ```dart
 await Scout.initFromEnv(options: const ScoutOptions(
-  apiBaseUrl: 'https://api.yourapp.com', // resolves path-only URLs in recordNetwork
-  networkLogScope: ScoutNetworkLogScope.errorsOnly, // default: all
+  apiBaseUrl: 'https://api.yourapp.com',
+  networkLogScope: ScoutNetworkLogScope.all, // or errorsOnly / slowOnly
   networkIgnoreStatusCodes: {401, 403},
 ));
 
-final apiDio = Dio(BaseOptions(
-  baseUrl: 'https://api.yourapp.com',
-  connectTimeout: const Duration(seconds: 15),
-  receiveTimeout: const Duration(seconds: 15),
-));
-
-apiDio.attachScout(); // inserts interceptor first — times every request
+apiDio.attachScout(); // insert first on interceptor stack
 ```
 
 | `networkLogScope` | Logs |
 |-------------------|------|
-| `all` (default) | Every request (success → span, errors → network event) |
-| `errorsOnly` | HTTP 4xx/5xx and Dio failures only |
-| `slowOnly` | Requests exceeding `networkSlowThresholdMs` only |
+| `all` (default) | Every request |
+| `errorsOnly` | 4xx/5xx + Dio failures |
+| `slowOnly` | Requests ≥ `networkSlowThresholdMs` |
 
-**Custom interceptors / bridges** — use public capture helpers (no `src/` imports):
+Override from dashboard: **Settings → Network log scope**.
+
+**Custom interceptors** — public helpers (no `src/` imports):
 
 ```dart
-import 'package:scout_logger_plus/scout_logger_plus.dart';
-
-final request = captureRequest(options, redactHeaders: scout.options.networkRedactHeaders);
 Scout.instance.recordNetwork(
   method: 'GET',
   url: options.uri.toString(),
@@ -397,119 +320,61 @@ Scout.instance.recordNetwork(
 );
 ```
 
-### With dio_resilient
+### dio_resilient
 
 Split logging to avoid duplicates:
 
-1. `attachScout()` on the shared Dio — captures HTTP errors with response body.
-2. `onRequestLog` — map to [ScoutResilientLog] and call `recordResilientLog` for success/cache/queue only.
-3. Do not log the same route twice on success.
+1. `attachScout()` — HTTP errors with response body.
+2. `onRequestLog` — success/cache/queue via `recordResilientLog` only.
+3. Skip duplicate success logging.
 
 ```dart
-dio_resilient.onRequestLog = (log) {
+onRequestLog: (log) {
   Scout.instance.recordResilientLog(ScoutResilientLog.fromMap(log.toJson()));
-  // or: ScoutResilientLog(method: log.method, path: log.path, outcome: log.outcome, ...)
-};
+},
 ```
 
-`recordResilientLog` **skips** `outcome: error` — Dio/`attachScout` already logged the failure.
-
-Always pass **absolute URLs** (`options.uri.toString()`) or set `apiBaseUrl` in `ScoutOptions`.
-
-Scout automatically skips its own ingest traffic. Requests slower than **3s** (default) are flagged `slow: true` in the dashboard.
-
-**Ignore expected HTTP status codes** (no network event, no breadcrumb):
-
-```dart
-await Scout.init(dsn, options: const ScoutOptions(
-  networkIgnoreStatusCodes: {401, 403}, // e.g. token refresh 401
-));
-```
-
-Or configure remotely in the dashboard — **Project → Settings → Ignore HTTP status codes** (see § Remote config). When a status matches, `recordNetwork()` returns before enqueue.
-
-Disable slow detection:
-
-```dart
-ScoutOptions(networkSlowThresholdMs: null)
-```
+`recordResilientLog` **skips** `outcome: error` — Dio already logged it.
 
 ---
 
-## 8. Secrets and redaction
+## Remote config
 
-Sensitive values are **not** sent in event payloads or debug logs.
+| When | What |
+|------|------|
+| Init | `GET /v1/client/config` merged into options |
+| App resume | Re-fetch if `configVersion` increased |
+| Ingest `202` | May include `configVersion` → refresh |
 
-| What | Protection |
-|------|------------|
-| Ingest key (`sk_live_…`) | Auth header only — never in payloads |
-| `setContext()` / `setContextKey()` | `password`, `token`, `api_key`, `dsn`, … → `[Redacted]` |
-| Network headers | `Authorization`, `Cookie`, `X-Api-Key`, … → `[Redacted]` |
-| Network URLs | URL credentials + query params (`token`, `secret`, …) redacted |
-| Debug console | Ingest errors strip the key before `debugPrint` |
+```dart
+ScoutOptions(useRemoteConfig: false) // opt out — code-only options
+```
 
-Extend via `ScoutOptions.networkRedactHeaders` and `networkRedactQueryParams`.
+**Verify:** Dashboard → **Settings** → change log levels / network scope → Save → relaunch or background → foreground → check `Scout.instance.options`.
+
+Contract: [SDK-DASHBOARD-COMPAT.md](docs/SDK-DASHBOARD-COMPAT.md) · [platform doc](https://github.com/alrashidi-approc/scout-logger/blob/main/docs/SDK-DASHBOARD-COMPAT.md)
 
 ---
 
-## 9. Remote config (dashboard Settings)
-
-Ops can tune SDK behaviour per project from the dashboard without shipping a new app build. The SDK fetches settings with the same ingest key as the DSN.
-
-| When | What happens |
-|------|----------------|
-| **Init** | `GET /v1/client/config` — merged into runtime options |
-| **App resume** | Re-fetch if `configVersion` increased |
-| **Ingest flush** | `202` responses may include `configVersion` — triggers refresh |
-
-**Dashboard-controlled fields** (remote wins over local defaults):
-
-- `enabledLevels`
-- `enableFlutterHooks`
-- `trackNavigation`
-- `networkCaptureBodies`
-- `networkSlowThresholdMs`
-- `networkIgnoreStatusCodes`
-- `networkLogScope` (`all`, `errorsOnly`, `slowOnly`)
-
-**Always local** (never overwritten by remote): `environment`, `release`, redaction lists, `flushInterval`, DSN.
+## Options reference
 
 ```dart
 const ScoutOptions(
-  useRemoteConfig: true,  // default — set false to use code-only options
-  networkIgnoreStatusCodes: {401}, // used until remote loads; then remote wins
-);
-```
-
-Opt out entirely:
-
-```dart
-ScoutOptions(useRemoteConfig: false)
-```
-
-**Verify:** Dashboard → **Settings** → uncheck **INFO**, add **401** to ignore codes → Save → relaunch app (or background → foreground). `Scout.instance.options.enabledLevels` should exclude `info`; API calls returning 401 should not appear under **Events**.
-
-Platform contract: [scout-logger SDK-DASHBOARD-COMPAT.md](https://github.com/YOUR_ORG/scout-logger/blob/main/docs/SDK-DASHBOARD-COMPAT.md)
-
----
-
-## 10. Options reference
-
-```dart
-const ScoutOptions(
-  environment: 'production',       // or SCOUT_ENVIRONMENT in .env
-  useRemoteConfig: true,           // fetch dashboard Settings on init / resume
-  enabledLevels: {ScoutLevel.error, ScoutLevel.warning},
+  environment: 'production',
+  useRemoteConfig: true,
+  enabledLevels: {ScoutLevel.error, ScoutLevel.warning, ScoutLevel.info, ScoutLevel.success},
   trackNavigation: true,
   enableFlutterHooks: true,
-  autoCollectRelease: true,        // version/build from package_info_plus
-  networkSlowThresholdMs: 3000,    // null = disable slow flag
-  networkIgnoreStatusCodes: {},    // e.g. {401, 403}
+  autoCollectRelease: true,
+  apiBaseUrl: 'https://api.yourapp.com',
+  networkLogScope: ScoutNetworkLogScope.all,
+  networkSlowThresholdMs: 3000,       // null = disable slow flag
+  networkIgnoreStatusCodes: {},
   networkCaptureBodies: true,
   networkMaxBodyLength: 8192,
   flushInterval: Duration(seconds: 15),
   maxBatchSize: 20,
-  recoverOrphanSessions: true,     // end sessions killed by OS crash
+  recoverOrphanSessions: true,
   sessionBackgroundTimeout: Duration(minutes: 30),
   autoTrackConnectivity: true,
   debug: false,
@@ -518,60 +383,46 @@ const ScoutOptions(
 
 ---
 
-## 11. Auto-collected (no extra code)
+## Auto-collected
 
 | Data | How |
 |------|-----|
-| Device model, OS, locale | At init |
+| Device model, OS, locale, battery | At init; battery on resume |
 | Anonymous user id | When `setUser()` not called |
 | App version / build | `package_info_plus` |
-| Session start / heartbeat / end | Lifecycle + 2‑min heartbeats + background timeout |
-| Screen trail + `navigationType` + dwell | Navigation or GoRouter |
+| Session start / heartbeat / end | Lifecycle + 2 min heartbeats |
+| Screen trail + `navigationType` | Navigation or GoRouter |
 | Breadcrumbs | Nav, logs, errors, network, actions |
 | Network (redacted) | `attachScout()` on app Dio |
 | Online / offline | `connectivity_plus` |
-| Country hint | Device locale → server geo enrichment |
 
 ---
 
-## 12. Verify integration
+## Verify in dashboard
 
-1. Start scout, create a project, paste the dashboard DSN into `.env`.
-2. Run the app, navigate **Home → checkout → back**, then send a test event:
+1. Paste DSN into `.env`, run app.
+2. Navigate Home → checkout → back.
+3. Send test error + `flush()`.
+4. Confirm:
+   - **Issues** — test error
+   - **Events** → **Timeline** → **User journey** — PUSH/POP badges
+   - **Analytics → Sessions** — visit + trail
+   - **Events** — network rows (unless ignored status / scope)
 
 ```dart
-Scout.instance.captureException(
-  StateError('Scout connection test'),
-  StackTrace.current,
-);
+Scout.instance.captureException(StateError('Scout test'), StackTrace.current);
 await Scout.instance.flush();
 ```
 
-3. In the dashboard:
-   - **Issues** — the test error
-   - **Events** → open event → **Timeline** → **User journey** — steps show **PUSH** / **POP** (no yellow “navigation type not recorded” warning)
-   - **Analytics → Sessions** — your visit, screen trail, session summary
-   - **Events** — network rows if you called your API Dio (unless status is in ignore list)
-
-Health check (same host as in DSN):
-
-```bash
-curl -s -o /dev/null -w "%{http_code}\n" https://your-host/health
-# expect 200
-```
-
 ---
 
-## 13. Example app
+## Example app
 
 ```bash
-cd example
-cp .env.example .env   # paste DSN
-flutter pub get
-flutter run
+cd example && cp .env.example .env && flutter pub get && flutter run
 ```
 
-The example demonstrates: `initFromEnv`, `ScoutApp` + routes, test error, screen trail, and `attachScout()` on a demo API. See [example/README.md](example/README.md).
+See [example/README.md](example/README.md).
 
 ---
 
@@ -579,15 +430,35 @@ The example demonstrates: `initFromEnv`, `ScoutApp` + routes, test error, screen
 
 | Problem | Fix |
 |---------|-----|
-| Scout not initialized | Add `SCOUT_DSN` to `.env` and register `- .env` under `flutter: assets:` |
-| Receive timeout on ingest | DSN missing `:PORT` — copy the **full** DSN from the dashboard |
-| No screen trail | Use `ScoutApp` + `navigatorObservers`, or `attachScoutGoRouter` — not both |
-| Timeline shows “NO NAV” / yellow warning | Upgrade to **0.2.0+** and ensure navigation integration is active (`trackNavigation: true`) |
-| Duplicate screen events | GoRouter: use `attachScoutGoRouter` only; remove `navigatorObservers` |
-| No network events | Call `attachScout()` on your **app** Dio after init |
-| 401/403 still logged after ignore | Remote config wins — check dashboard **Settings**, or set `useRemoteConfig: false` |
-| Remote settings not applied | Relaunch app or background → foreground; check server `/v1/client/config` |
-| Scout works locally, not on device | Device must reach the host in DSN (not `localhost` unless emulator) |
-| Ingest key visible in dashboard | Upgrade SDK — keys must never appear in payloads |
+| `flutter pub get` fails on `scout_models` | Add `dependency_overrides` for `scout_models` (see **Install**) — platform repo is private |
+| Scout not initialized | `SCOUT_DSN` in `.env` + `flutter: assets: [.env]` |
+| Ingest timeout | DSN missing `:PORT` |
+| Timeline “NO NAV” warning | Use v1.0.0+, enable `trackNavigation`, wire navigation |
+| Duplicate screens | GoRouter: `attachScoutGoRouter` only |
+| No network events | `attachScout()` on app Dio after init |
+| 401 still logged | Check dashboard **Settings** ignore codes (remote wins) |
+| Remote settings stale | Background → foreground or relaunch |
 
-Platform setup (server, dashboard, deploy): [scout-logger README](https://github.com/YOUR_ORG/scout-logger/blob/main/README.md)
+---
+
+## Changelog
+
+### v1.0.0 (2026-06)
+
+First stable release — full dashboard compatibility.
+
+- Screen trail `navigationType` (Timeline badges)
+- Remote SDK config (7 dashboard-controlled fields)
+- Session heartbeats + summary
+- Network scope, ignore codes, slow threshold (local + remote)
+- Public network capture API + dio_resilient bridge
+- Battery level in device payload
+- EPA redaction defaults (`securpass`, `epamobkey`, …)
+
+### Pre-1.0 history
+
+Internal `0.2.x` tags preceded v1.0.0 during dashboard compat work. New integrations should use **`v1.0.0`** only.
+
+---
+
+Platform setup: [scout-logger README](https://github.com/alrashidi-approc/scout-logger/blob/main/README.md) · EPA feedback: [docs/scout_logger_plus_enhancement_suggestions.md](docs/scout_logger_plus_enhancement_suggestions.md)

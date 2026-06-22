@@ -1,6 +1,6 @@
 name: scout_logger_plus
 description: Flutter client SDK for scout-logger — bridge apps to the dashboard via ingest API.
-version: 0.2.2
+version: 1.0.0
 publish_to: none
 
 environment:

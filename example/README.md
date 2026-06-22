@@ -1,8 +1,8 @@
 # scout_logger_plus example
 
-Minimal reference app — copy patterns from here into your client project.
+Minimal reference app — copy patterns into your client project.
 
-Full integration guide: [../README.md](../README.md) (see **What's new in 0.2.0** for dashboard Timeline badges and remote Settings).
+**Release:** [`v1.0.0`](https://github.com/alrashidi-approc/scout_logger_plus/releases/tag/v1.0.0) · Full guide: [../README.md](../README.md)
 
 ## Setup
 
@@ -23,27 +23,18 @@ flutter run
 | App API Dio + `attachScout()` | `apiDio` in `main()` |
 | `setUser()` after init | `main()` |
 | Test error + `flush()` | **Send test error** button |
-| Screen trail with `navigationType` | **Go to checkout** → `/` → `/checkout` (PUSH in dashboard) |
-| Network event | **Call demo API** (httpbin via app Dio) |
+| Screen trail + `navigationType` | **Go to checkout** |
+| Network event | **Call demo API** |
 
 ## Try in the dashboard
 
 1. **Issues** — tap **Send test error**
-2. **Events** → open the error → **Timeline** → **User journey** — **PUSH** badge on checkout step
-3. **Analytics → Sessions** — open the app, navigate to checkout, go back
-4. **Events** — tap **Call demo API** for a network row
+2. **Events** → **Timeline** → **User journey** — **PUSH** on checkout
+3. **Analytics → Sessions** — full visit trail
+4. **Events** — network row from demo API call
 
-Keep `.env` out of git — it contains your ingest key.
+Keep `.env` out of git.
 
-## GoRouter apps
+## GoRouter
 
-This example uses imperative `MaterialApp` routes. For GoRouter, see [../README.md § Navigation B](../README.md#b--gorouter) — routes are recorded as **`go`**.
-
-## Timeout troubleshooting
-
-`receive timeout` usually means the DSN is **missing the port**. Copy the full DSN from the dashboard — do not drop `:PORT`.
-
-```bash
-curl -s -o /dev/null -w "%{http_code}\n" https://your-host/health
-# expect 200
-```
+See [../README.md § Navigation B](../README.md#b--gorouter).
