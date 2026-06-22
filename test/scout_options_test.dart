@@ -13,11 +13,13 @@ void main() {
       enabledLevels: ['error', 'warning'],
       networkIgnoreStatusCodes: [403, 404],
       trackNavigation: false,
+      networkLogScope: 'errorsOnly',
     ));
 
     expect(merged.enabledLevels, {ScoutLevel.error, ScoutLevel.warning});
     expect(merged.networkIgnoreStatusCodes, {403, 404});
     expect(merged.trackNavigation, isFalse);
+    expect(merged.networkLogScope, ScoutNetworkLogScope.errorsOnly);
     expect(merged.environment, local.environment);
     expect(merged.useRemoteConfig, local.useRemoteConfig);
   });

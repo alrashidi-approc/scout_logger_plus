@@ -16,6 +16,7 @@ void main() {
           'sdk': {
             'enabledLevels': ['error'],
             'networkIgnoreStatusCodes': [401],
+            'networkLogScope': 'slowOnly',
           },
         },
       ));
@@ -26,6 +27,7 @@ void main() {
     expect(remote!.configVersion, 3);
     expect(remote.sdk.resolved().enabledLevels, ['error']);
     expect(remote.sdk.resolved().networkIgnoreStatusCodes, [401]);
+    expect(remote.sdk.resolved().networkLogScope, 'slowOnly');
   });
 
   test('fetch returns null on failure', () async {

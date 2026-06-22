@@ -185,7 +185,9 @@ String _outcomeLabel(String outcome) => switch (outcome) {
 
 String _shortUrl(String url) {
   final uri = Uri.tryParse(url);
-  if (uri == null) return url;
+  if (uri == null || !uri.hasScheme) {
+    return url.startsWith('/') ? url : '/$url';
+  }
   final path = uri.path.isEmpty ? '/' : uri.path;
   return uri.hasQuery ? '$path?${uri.query}' : path;
 }

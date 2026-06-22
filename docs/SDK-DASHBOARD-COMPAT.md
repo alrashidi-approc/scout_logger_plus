@@ -489,7 +489,8 @@ Response:
     "trackNavigation": true,
     "networkCaptureBodies": false,
     "networkSlowThresholdMs": 3000,
-    "networkIgnoreStatusCodes": [401, 403]
+    "networkIgnoreStatusCodes": [401, 403],
+    "networkLogScope": "errorsOnly"
   }
 }
 ```
@@ -531,9 +532,10 @@ Types: `ProjectSdkConfig`, `ProjectRemoteConfig` in `sdk_config.dart`.
 | `trackNavigation` | `bool` | `true` | Screen trail + nav observer |
 | `networkCaptureBodies` | `bool` | `true` | Request/response bodies in network events |
 | `networkSlowThresholdMs` | `int` | `3000` | Flag slow requests (`500–60000`) |
+| `networkLogScope` | `string` | `all` | `all` / `errorsOnly` / `slowOnly` — which HTTP calls to upload |
 | `networkIgnoreStatusCodes` | `int[]` | `[]` | Skip network logging for these HTTP codes |
 
-Validation helpers: `normalizeEnabledLevels`, `normalizeStatusCodes`, `clampSlowThreshold`.
+Validation helpers: `normalizeEnabledLevels`, `normalizeStatusCodes`, `normalizeNetworkLogScope`, `clampSlowThreshold`.
 
 ### SDK implementation checklist
 

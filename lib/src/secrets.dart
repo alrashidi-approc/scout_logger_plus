@@ -1,3 +1,5 @@
+import 'enums.dart';
+
 const _redacted = '[Redacted]';
 
 const _sensitiveQueryKeys = {
@@ -16,6 +18,9 @@ const _sensitiveQueryKeys = {
   'session',
   'session_id',
   'dsn',
+  'securpass',
+  'securuser',
+  'civilid',
 };
 
 const _sensitiveContextKeys = {
@@ -79,6 +84,30 @@ String redactSecretsInText(String text, Iterable<String> secrets) {
   }
   return out;
 }
+
+/// Resolve path-only URLs using [apiBaseUrl] from [ScoutOptions].
+String resolveNetworkUrl(String url, {String? apiBaseUrl}) {
+  final trimmed = url.trim();
+  if (trimmed.isEmpty) return trimmed;
+  final uri = Uri.tryParse(trimmed);
+  if (uri != null && uri.hasScheme) return trimmed;
+  final base = apiBaseUrl?.trim();
+  if (base == null || base.isEmpty) return trimmed;
+  final normalized = base.endsWith('/') ? base : '$base/';
+  final path = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+  return Uri.parse(normalized).resolve(path).toString();
+}
+
+bool shouldLogNetwork({
+  required ScoutNetworkLogScope scope,
+  required bool isError,
+  required bool slow,
+}) =>
+    switch (scope) {
+      ScoutNetworkLogScope.all => true,
+      ScoutNetworkLogScope.errorsOnly => isError,
+      ScoutNetworkLogScope.slowOnly => slow,
+    };
 
 String maskIngestKey(String key) {
   if (key.length <= 12) return _redacted;

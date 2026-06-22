@@ -28,6 +28,8 @@ class ScoutOptions {
       'set-cookie',
       'x-api-key',
       'x-auth-token',
+      'epamobkey',
+      'appapikey',
       'proxy-authorization',
     },
     this.networkRedactQueryParams = const {
@@ -41,9 +43,14 @@ class ScoutOptions {
       'password',
       'auth',
       'dsn',
+      'securpass',
+      'securuser',
+      'civilid',
     },
     this.networkSlowThresholdMs = 3000,
     this.networkIgnoreStatusCodes = const {},
+    this.networkLogScope = ScoutNetworkLogScope.all,
+    this.apiBaseUrl,
     this.recoverOrphanSessions = true,
     this.sessionBackgroundTimeout = const Duration(minutes: 30),
     this.autoTrackConnectivity = true,
@@ -68,6 +75,9 @@ class ScoutOptions {
   /// Flag network events slower than this (ms). Set to `null` to disable.
   final int? networkSlowThresholdMs;
   final Set<int> networkIgnoreStatusCodes;
+  final ScoutNetworkLogScope networkLogScope;
+  /// Resolves path-only URLs in [Scout.recordNetwork] (e.g. `/api/inbox`).
+  final String? apiBaseUrl;
   final bool recoverOrphanSessions;
   final Duration? sessionBackgroundTimeout;
   final bool autoTrackConnectivity;
@@ -96,6 +106,8 @@ class ScoutOptions {
       networkRedactQueryParams: networkRedactQueryParams,
       networkSlowThresholdMs: resolved.networkSlowThresholdMs ?? networkSlowThresholdMs,
       networkIgnoreStatusCodes: resolved.networkIgnoreStatusCodes!.toSet(),
+      networkLogScope: ScoutNetworkLogScopeX.parse(resolved.networkLogScope),
+      apiBaseUrl: apiBaseUrl,
       recoverOrphanSessions: recoverOrphanSessions,
       sessionBackgroundTimeout: sessionBackgroundTimeout,
       autoTrackConnectivity: autoTrackConnectivity,

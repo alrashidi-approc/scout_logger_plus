@@ -4,9 +4,28 @@ Flutter SDK for the [scout-logger](https://github.com/YOUR_ORG/scout-logger) pla
 
 This package lives in its **own GitHub repo** (separate from the server/dashboard). Add it to your Flutter app; point it at a scout project DSN.
 
-**Current version: `0.2.0`** — dashboard-compatible payloads (navigation badges, remote settings, session heartbeats, HTTP ignore codes). Requires `scout_models` from the platform repo with `navigation.dart` and `sdk_config.dart` (included on platform `main`).
+**Current version: `0.2.2`** — dashboard-compatible payloads (navigation badges, remote settings, session heartbeats, HTTP ignore codes). Requires `scout_models` from the platform repo with `navigation.dart` and `sdk_config.dart` (included on platform `main`).
 
 ---
+
+## What's new in 0.2.2
+
+| Feature | Client impact |
+|---------|----------------|
+| **`networkLogScope` in remote config** | Dashboard **Settings** controls `all` / `errorsOnly` / `slowOnly` per project |
+| **`recordResilientLog`** | Official dio_resilient bridge — success/cache/queue only |
+| **`batteryLevel`** | Device tab shows battery (`0.00`–`1.00` string), refreshed on resume |
+
+## What's new in 0.2.1
+
+| Feature | Client impact |
+|---------|----------------|
+| **`ScoutNetworkLogScope`** | `errorsOnly` / `slowOnly` — less noise from `attachScout()` |
+| **Public network capture API** | `captureRequest`, `captureResponse`, `buildCurl`, `buildNetworkReadable` exported |
+| **`apiBaseUrl`** | Resolves path-only URLs in `recordNetwork` |
+| **`hasResponseOverride`** | Bridge layers can flag HTTP responses without a body map |
+| **EPA redaction defaults** | `securpass`, `securuser`, `epamobkey`, `civilid`, … |
+| **`package_info_plus`** | Wider constraint `>=8.3.0 <11.0.0` for pub solver |
 
 ## What's new in 0.2.0
 
@@ -342,6 +361,12 @@ Uncaught Flutter and platform errors are captured automatically (`enableFlutterH
 Use a **dedicated Dio** for your backend. Never call `attachScout()` on scout's private ingest client.
 
 ```dart
+await Scout.initFromEnv(options: const ScoutOptions(
+  apiBaseUrl: 'https://api.yourapp.com', // resolves path-only URLs in recordNetwork
+  networkLogScope: ScoutNetworkLogScope.errorsOnly, // default: all
+  networkIgnoreStatusCodes: {401, 403},
+));
+
 final apiDio = Dio(BaseOptions(
   baseUrl: 'https://api.yourapp.com',
   connectTimeout: const Duration(seconds: 15),
@@ -350,6 +375,46 @@ final apiDio = Dio(BaseOptions(
 
 apiDio.attachScout(); // inserts interceptor first — times every request
 ```
+
+| `networkLogScope` | Logs |
+|-------------------|------|
+| `all` (default) | Every request (success → span, errors → network event) |
+| `errorsOnly` | HTTP 4xx/5xx and Dio failures only |
+| `slowOnly` | Requests exceeding `networkSlowThresholdMs` only |
+
+**Custom interceptors / bridges** — use public capture helpers (no `src/` imports):
+
+```dart
+import 'package:scout_logger_plus/scout_logger_plus.dart';
+
+final request = captureRequest(options, redactHeaders: scout.options.networkRedactHeaders);
+Scout.instance.recordNetwork(
+  method: 'GET',
+  url: options.uri.toString(),
+  statusCode: 404,
+  hasResponseOverride: true,
+  response: captureResponse(error.response!),
+);
+```
+
+### With dio_resilient
+
+Split logging to avoid duplicates:
+
+1. `attachScout()` on the shared Dio — captures HTTP errors with response body.
+2. `onRequestLog` — map to [ScoutResilientLog] and call `recordResilientLog` for success/cache/queue only.
+3. Do not log the same route twice on success.
+
+```dart
+dio_resilient.onRequestLog = (log) {
+  Scout.instance.recordResilientLog(ScoutResilientLog.fromMap(log.toJson()));
+  // or: ScoutResilientLog(method: log.method, path: log.path, outcome: log.outcome, ...)
+};
+```
+
+`recordResilientLog` **skips** `outcome: error` — Dio/`attachScout` already logged the failure.
+
+Always pass **absolute URLs** (`options.uri.toString()`) or set `apiBaseUrl` in `ScoutOptions`.
 
 Scout automatically skips its own ingest traffic. Requests slower than **3s** (default) are flagged `slow: true` in the dashboard.
 
@@ -405,6 +470,7 @@ Ops can tune SDK behaviour per project from the dashboard without shipping a new
 - `networkCaptureBodies`
 - `networkSlowThresholdMs`
 - `networkIgnoreStatusCodes`
+- `networkLogScope` (`all`, `errorsOnly`, `slowOnly`)
 
 **Always local** (never overwritten by remote): `environment`, `release`, redaction lists, `flushInterval`, DSN.
 

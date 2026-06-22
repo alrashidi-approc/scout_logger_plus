@@ -14,6 +14,7 @@ import 'flutter_binding.dart';
 import 'ingest_client.dart';
 import 'install_store.dart';
 import 'remote_config_client.dart';
+import 'resilient_bridge.dart';
 import 'network_capture.dart';
 import 'scout_env.dart';
 import 'scout_options.dart';
@@ -116,6 +117,8 @@ class Scout {
         networkRedactQueryParams: o.networkRedactQueryParams,
         networkSlowThresholdMs: o.networkSlowThresholdMs,
         networkIgnoreStatusCodes: o.networkIgnoreStatusCodes,
+        networkLogScope: o.networkLogScope,
+        apiBaseUrl: o.apiBaseUrl,
         recoverOrphanSessions: o.recoverOrphanSessions,
         sessionBackgroundTimeout: o.sessionBackgroundTimeout,
         autoTrackConnectivity: o.autoTrackConnectivity,
@@ -345,16 +348,20 @@ class Scout {
     String? errorType,
     bool failed = false,
     bool fromInterceptor = false,
+    bool? hasResponseOverride,
     Map<String, dynamic>? request,
     Map<String, dynamic>? response,
     String? curl,
+    Map<String, dynamic>? networkExtra,
   }) {
     if (statusCode != null && _options.networkIgnoreStatusCodes.contains(statusCode)) return;
-    final safeUrl = redactUrl(url, redactQueryKeys: _options.networkRedactQueryParams);
+    final resolvedUrl = resolveNetworkUrl(url, apiBaseUrl: _options.apiBaseUrl);
+    final safeUrl = redactUrl(resolvedUrl, redactQueryKeys: _options.networkRedactQueryParams);
     final isError = failed || (statusCode != null && statusCode >= 400);
-    final hasResponse = statusCode != null || response != null;
     final threshold = _options.networkSlowThresholdMs;
     final slow = threshold != null && durationMs != null && durationMs >= threshold;
+    if (!shouldLogNetwork(scope: _options.networkLogScope, isError: isError, slow: slow)) return;
+    final hasResponse = hasResponseOverride ?? (statusCode != null || response != null);
     final readable = buildNetworkReadable(
       method: method,
       url: safeUrl,
@@ -407,9 +414,42 @@ class Scout {
           if (response != null) 'response': response,
           if (curl != null) 'curl': curl,
           'readable': readable,
+          if (networkExtra != null && networkExtra.isNotEmpty) ...networkExtra,
         },
       },
       urgent: isError,
+    );
+  }
+
+  /// Bridge [dio_resilient] `onRequestLog` — logs success/cache/queue only.
+  ///
+  /// Skip `outcome: error` here; [ScoutDioInterceptor] captures HTTP failures with body.
+  void recordResilientLog(ScoutResilientLog log) {
+    if (scoutResilientOutcomeIsError(log.outcome)) return;
+    final rawUrl = log.url ?? log.path;
+    recordNetwork(
+      method: log.method,
+      url: rawUrl,
+      statusCode: log.statusCode,
+      durationMs: log.durationMs,
+      error: log.errorMessage,
+      failed: log.statusCode != null && log.statusCode! >= 400,
+      hasResponseOverride: log.statusCode != null,
+      request: {
+        'method': log.method,
+        'url': resolveNetworkUrl(rawUrl, apiBaseUrl: _options.apiBaseUrl),
+        'resilient': {
+          'outcome': log.outcome,
+          if (log.fromCache) 'fromCache': true,
+          if (log.queuedOffline) 'queuedOffline': true,
+          if (log.peakHourBucket != null) 'peakHourBucket': log.peakHourBucket,
+        },
+      },
+      response: log.statusCode != null && log.errorMessage != null
+          ? {'statusCode': log.statusCode, 'body': log.errorMessage}
+          : log.statusCode != null
+              ? {'statusCode': log.statusCode}
+              : null,
     );
   }
 
@@ -555,6 +595,9 @@ class Scout {
           message: 'App foregrounded',
         );
         unawaited(_refreshRemoteConfig());
+        unawaited(_deviceCollector.refreshBattery().then((_) async {
+          _device = await _deviceCollector.collect();
+        }));
       },
       onEnd: () {
         _endSession();
