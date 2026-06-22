@@ -112,7 +112,7 @@ Attach these top-level keys inside **`payload`** on every error/crash/log (and s
 | Network block | `payload.network` | Technical + Raw tabs, network readable panel |
 | Overview | `payload.overview.title` | Fallback message |
 | Custom context | `payload.custom` | Product context section |
-| Device detail | `device.deviceName`, `osVersion`, `manufacturer`, `deviceModel`, `darkMode`, `timezone`, `languageCode`, `countryCode`, `batteryLevel`, `isOnline` | Device & connectivity |
+| Device detail | `device.deviceName`, `osVersion`, `manufacturer`, `deviceModel`, `darkMode`, `timezone`, `languageCode`, `locale`, `localeCountry`, `country`, `batteryLevel`, `isOnline` | Device & connectivity |
 | Session summary | `payload.summary` on `type: session` | Analytics → Sessions |
 
 ---
@@ -291,7 +291,9 @@ Collect once at init + refresh on connectivity/battery changes:
   "darkMode": true,
   "timezone": "Asia/Kuwait",
   "languageCode": "en",
-  "countryCode": "KW",
+  "locale": "en-KW",
+  "localeCountry": "KW",
+  "country": "KW",
   "isOnline": true,
   "batteryLevel": "0.82"
 }
@@ -402,7 +404,7 @@ Suggested layout in **scout_logger_plus**:
 | Issues grouping | `type` error/crash/network + stack/message fingerprint |
 | Analytics funnels | Distinct `screenTrail[].route` values across sessions |
 | Sessions replay | `type: session` + `screenTrail` + `summary` |
-| Users / Geo | `user.id`, optional `device.countryCode`; server adds IP geo |
+| Users / Geo | `device.localeCountry` (phone region) + `device.country` (ip-api.com, else locale); server confirms via request IP. No GPS. |
 | Project Settings (SDK tab) | Remote config via `GET /v1/client/config` (§16) |
 
 ---

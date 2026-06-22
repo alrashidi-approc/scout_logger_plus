@@ -180,6 +180,8 @@ class Scout {
     scout._configVersion = configVersion;
 
     scout._device = await deviceCollector.collect();
+    await deviceCollector.refreshCountry();
+    scout._device = deviceCollector.current();
     scout._install = await InstallStore.loadOrCreate();
     scout._device.addAll({
       'installId': scout._install['installId'],
@@ -256,7 +258,7 @@ class Scout {
 
   void setDevice(Map<String, dynamic> device) {
     _device.addAll(device);
-    _deviceCollector.patch(device);
+    _deviceCollector.patch(device, lockCountry: device.containsKey('country'));
   }
 
   void setContext(Map<String, dynamic> data) => _context.addAll(redactContext(data));

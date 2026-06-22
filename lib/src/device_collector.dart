@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -12,6 +13,9 @@ import 'package:package_info_plus/package_info_plus.dart';
 class DeviceCollector {
   Map<String, dynamic> _cached = {};
   final Battery _battery = Battery();
+  bool _countryManual = false;
+
+  static const _ipApiUrl = 'http://ip-api.com/json?fields=status,countryCode';
 
   Future<String?> _batteryLevel() async {
     try {
@@ -125,7 +129,24 @@ class DeviceCollector {
     return Map<String, dynamic>.from(_cached);
   }
 
-  void patch(Map<String, dynamic> data) => _cached.addAll(data);
+  Map<String, dynamic> current() => Map<String, dynamic>.from(_cached);
+
+  /// Sets [device.country] from ip-api.com, else device locale. No location permission.
+  Future<void> refreshCountry() async {
+    if (_countryManual) return;
+    final fromIp = await _countryFromIpApi();
+    if (fromIp != null) {
+      _cached['country'] = fromIp;
+      return;
+    }
+    final locale = _cached['localeCountry']?.toString();
+    if (locale != null && locale.isNotEmpty) _cached['country'] = locale.toUpperCase();
+  }
+
+  void patch(Map<String, dynamic> data, {bool lockCountry = false}) {
+    if (lockCountry && data.containsKey('country')) _countryManual = true;
+    _cached.addAll(data);
+  }
 
   Future<void> refreshBattery() async {
     final level = await _batteryLevel();
@@ -143,8 +164,25 @@ class DeviceCollector {
       'locale': locale.toLanguageTag(),
       'languageCode': locale.languageCode,
       if (locale.countryCode != null && locale.countryCode!.isNotEmpty)
-        'countryCode': locale.countryCode!.toUpperCase(),
+        'localeCountry': locale.countryCode!.toUpperCase(),
     };
+  }
+
+  Future<String?> _countryFromIpApi() async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
+    try {
+      final req = await client.getUrl(Uri.parse(_ipApiUrl));
+      final res = await req.close().timeout(const Duration(seconds: 3));
+      if (res.statusCode != 200) return null;
+      final j = jsonDecode(await res.transform(utf8.decoder).join()) as Map<String, dynamic>;
+      if (j['status'] != 'success') return null;
+      final code = j['countryCode']?.toString().trim();
+      return code == null || code.isEmpty ? null : code.toUpperCase();
+    } catch (_) {
+      return null;
+    } finally {
+      client.close(force: true);
+    }
   }
 }
 
