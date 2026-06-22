@@ -683,7 +683,12 @@ class Scout {
     String? last;
     Timer? timer;
     void sync() {
-      final loc = currentLocation();
+      String loc;
+      try {
+        loc = currentLocation();
+      } catch (_) {
+        return;
+      }
       if (loc.isEmpty || loc == last) return;
       last = loc;
       trackScreen(loc, navigationType: NavTransition.go);
