@@ -27,7 +27,16 @@ void attachScoutGoRouter(
   s.attachGoRouterListener(
     provider.addListener,
     provider.removeListener,
-    () => router.state.matchedLocation,
+    () => _scoutGoRouterLocation(router),
     debounce: debounce,
   );
+}
+
+String _scoutGoRouterLocation(GoRouter router) {
+  try {
+    return router.state.matchedLocation;
+  } catch (_) {
+    final path = router.routeInformationProvider.value.uri.path;
+    return path.isEmpty ? '/' : path;
+  }
 }
