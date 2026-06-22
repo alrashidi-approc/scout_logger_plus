@@ -20,7 +20,10 @@ dependencies:
   meta: ^1.16.0
   package_info_plus: '>=8.3.0 <11.0.0'
   scout_models:
-    path: ../scout-logger/packages/scout_models
+    git:
+      url: git@github.com:alrashidi-approc/scout-logger.git
+      path: packages/scout_models
+      ref: main
   uuid: ^4.5.1
   path_provider: ^2.1.5
 
