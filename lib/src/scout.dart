@@ -7,6 +7,7 @@ import 'package:scout_models/scout_models.dart';
 
 import 'breadcrumbs.dart';
 import 'device_collector.dart';
+import 'device_fingerprint.dart';
 import 'dsn.dart';
 import 'enums.dart';
 import 'event_queue.dart';
@@ -180,10 +181,12 @@ class Scout {
     scout._configVersion = configVersion;
 
     scout._device = await deviceCollector.collect();
-    scout._install = await InstallStore.loadOrCreate();
+    final fingerprint = await resolveDeviceFingerprint();
+    scout._install = await InstallStore.loadOrCreate(deviceKey: fingerprint);
     scout._device.addAll({
       'installId': scout._install['installId'],
       'anonymousId': scout._install['anonymousId'],
+      if (fingerprint != null) 'deviceFingerprint': fingerprint,
       'firstOpenAt': scout._install['firstOpenAt'],
       'launchCount': scout._install['launchCount'],
       'daysSinceInstall': scout._install['daysSinceInstall'],
@@ -522,6 +525,22 @@ class Scout {
     );
   }
 
+  Map<String, dynamic>? _userPayload() {
+    final installId = _install['installId']?.toString();
+    if (_user.hasData) {
+      return {
+        ..._user.toJson(),
+        if (installId != null) ...{'anonymousId': installId, 'installId': installId},
+      };
+    }
+    if (installId == null) return null;
+    return {
+      'id': installId,
+      'anonymousId': installId,
+      'sessionId': _sessionTracker.sessionId,
+    };
+  }
+
   Map<String, dynamic> _buildPayload({
     required ScoutLevel level,
     ScoutCategory? category,
@@ -533,13 +552,7 @@ class Scout {
       if (category != null) 'category': category.wire,
       'environment': _options.environment,
       'release': _release,
-      if (_user.hasData) 'user': _user.toJson(),
-      if (!_user.hasData && _install['anonymousId'] != null)
-        'user': {
-          'id': _install['anonymousId'],
-          'anonymousId': _install['anonymousId'],
-          'sessionId': _sessionTracker.sessionId,
-        },
+      if (_userPayload() case final user?) 'user': user,
       'device': Map<String, dynamic>.from(_device),
       'screen': _screenTrail.screenSnapshot(),
       'screenTrail': _screenTrail.toJson(),

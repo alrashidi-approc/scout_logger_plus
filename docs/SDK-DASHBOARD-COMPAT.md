@@ -99,6 +99,7 @@ Attach these top-level keys inside **`payload`** on every error/crash/log (and s
 | Environment | `payload.environment` | Quick facts, filters |
 | Release | `payload.release` or `release.name` | Release comparison, header chips |
 | User ID | `payload.user.id` | Users, geo, filters |
+| Device install ID | `device.installId` / `user.installId` | Guest id pre-login; linked on login for device count |
 | Session ID | `payload.user.sessionId` | Sessions, timeline |
 | Platform | `payload.device.platform` | Device tab, cards |
 | Current screen | `payload.screen.currentRoute` | Event header, screen fields |
@@ -114,6 +115,23 @@ Attach these top-level keys inside **`payload`** on every error/crash/log (and s
 | Custom context | `payload.custom` | Product context section |
 | Device detail | `device.deviceName`, `osVersion`, `manufacturer`, `deviceModel`, `darkMode`, `timezone`, `languageCode`, `countryCode`, `batteryLevel`, `isOnline` | Device & connectivity |
 | Session summary | `payload.summary` on `type: session` | Analytics → Sessions |
+
+### User & device identity (no extra app code)
+
+| State | `user.id` | `device.installId` |
+|-------|-----------|---------------------|
+| **Guest** (not logged in) | Same stable install / fingerprint id | `device_guard` hardware id when available, else persisted UUID |
+| **Logged in** | Your app user id from `setUser(id: …)` | Same fingerprint — also sent as `user.installId` / `user.anonymousId` |
+
+Fingerprint is resolved automatically via [`device_security_plugin`](https://github.com/Approc-com/device_security_plugin) (`DeviceGuard.getPersistentId`). Apps do not call it — only `Scout.init()`.
+
+On login call only:
+
+```dart
+Scout.instance.setUser(id: user.id, email: user.email, name: user.name);
+```
+
+The package keeps the same `installId` across launches and attaches it to the logged-in user so the backend can count devices per user and merge pre-login guest events.
 
 ---
 
