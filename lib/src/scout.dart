@@ -277,7 +277,7 @@ class Scout {
 
   /// User interaction — breadcrumb + lightweight span (checkout, button tap, etc.).
   void trackAction(String name, {Map<String, dynamic>? data}) {
-    if (name.isEmpty) return;
+    if (name.isEmpty || !_options.enabledLevels.contains(ScoutLevel.info)) return;
     _breadcrumbs.add(
       type: 'action',
       route: _screenTrail.currentRoute,
@@ -366,6 +366,12 @@ class Scout {
     final threshold = _options.networkSlowThresholdMs;
     final slow = threshold != null && durationMs != null && durationMs >= threshold;
     if (!shouldLogNetwork(scope: _options.networkLogScope, isError: isError, slow: slow)) return;
+    final level = isError
+        ? ScoutLevel.error
+        : _options.enabledLevels.contains(ScoutLevel.success)
+            ? ScoutLevel.success
+            : ScoutLevel.info;
+    if (!isError && !_options.enabledLevels.contains(level)) return;
     final hasResponse = hasResponseOverride ?? (statusCode != null || response != null);
     final readable = buildNetworkReadable(
       method: method,
@@ -401,7 +407,7 @@ class Scout {
     );
     _enqueue(
       type: fromInterceptor || isError ? 'network' : 'span',
-      level: isError ? ScoutLevel.error : ScoutLevel.info,
+      level: level,
       category: isError ? ScoutCategory.network : null,
       payload: {
         'message': summary,
@@ -514,6 +520,11 @@ class Scout {
         sessionId: sessionPayload['sessionId'] as String,
         startedAt: sessionPayload['startedAt'] as String,
       ));
+      if (_options.enabledLevels.contains(ScoutLevel.info)) {
+        _record(level: ScoutLevel.info, message: 'Session started');
+      } else if (_options.enabledLevels.contains(ScoutLevel.success)) {
+        _record(level: ScoutLevel.success, message: 'Session started');
+      }
     } else if (action == 'end') {
       unawaited(SessionStore.clear());
     }
@@ -526,18 +537,20 @@ class Scout {
   }
 
   Map<String, dynamic>? _userPayload() {
+    final sid = _sessionTracker.sessionId;
     final installId = _install['installId']?.toString();
     if (_user.hasData) {
       return {
         ..._user.toJson(),
+        'sessionId': _user.sessionId ?? sid,
         if (installId != null) ...{'anonymousId': installId, 'installId': installId},
       };
     }
-    if (installId == null) return null;
+    if (installId == null) return {'sessionId': sid};
     return {
       'id': installId,
       'anonymousId': installId,
-      'sessionId': _sessionTracker.sessionId,
+      'sessionId': sid,
     };
   }
 
@@ -548,6 +561,7 @@ class Scout {
   }) {
     return {
       ...payload,
+      'sessionId': _sessionTracker.sessionId,
       'level': level.wire,
       if (category != null) 'category': category.wire,
       'environment': _options.environment,

@@ -23,4 +23,13 @@ void main() {
     expect(merged.environment, local.environment);
     expect(merged.useRemoteConfig, local.useRemoteConfig);
   });
+
+  test('withRemote widens errorsOnly to all when info or success enabled', () {
+    const local = ScoutOptions();
+    final merged = local.withRemote(const ProjectSdkConfig(
+      enabledLevels: ['error', 'info', 'warning', 'success'],
+      networkLogScope: 'errorsOnly',
+    ));
+    expect(merged.networkLogScope, ScoutNetworkLogScope.all);
+  });
 }

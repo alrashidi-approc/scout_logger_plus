@@ -106,7 +106,7 @@ class ScoutOptions {
       networkRedactQueryParams: networkRedactQueryParams,
       networkSlowThresholdMs: resolved.networkSlowThresholdMs ?? networkSlowThresholdMs,
       networkIgnoreStatusCodes: resolved.networkIgnoreStatusCodes!.toSet(),
-      networkLogScope: ScoutNetworkLogScopeX.parse(resolved.networkLogScope),
+      networkLogScope: _networkScopeFromRemote(resolved),
       apiBaseUrl: apiBaseUrl,
       recoverOrphanSessions: recoverOrphanSessions,
       sessionBackgroundTimeout: sessionBackgroundTimeout,
@@ -114,4 +114,14 @@ class ScoutOptions {
       debug: debug,
     );
   }
+}
+
+/// Remote `errorsOnly` blocks info/success HTTP — widen to `all` when those levels are on.
+ScoutNetworkLogScope _networkScopeFromRemote(ProjectSdkConfig remote) {
+  final resolved = remote.resolved();
+  final scope = ScoutNetworkLogScopeX.parse(resolved.networkLogScope);
+  if (scope != ScoutNetworkLogScope.errorsOnly) return scope;
+  final levels = resolved.enabledLevels!;
+  if (levels.contains('info') || levels.contains('success')) return ScoutNetworkLogScope.all;
+  return scope;
 }
